@@ -1,0 +1,17 @@
+{
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.importFormat": "relative",
+    "python.testing.pytestEnabled": true,
+    "pylint.enabled": true,
+    "cSpell.words": [
+        "asyncio",
+        "keepends",
+        "pids",
+        "procs",
+        "pydantic",
+        "pylint",
+        "pytest",
+        "supervisord",
+        "uvicorn"
+    ],
+}
