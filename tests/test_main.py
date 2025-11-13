@@ -1,4 +1,4 @@
-# pylint: disable=protected-access, unused-argument
+# pylint: disable=protected-access, unused-argument, too-few-public-methods
 from collections import deque
 from datetime import datetime, timezone
 from unittest.mock import ANY
@@ -267,9 +267,7 @@ def test_tail_proc_output_stream(monkeypatch, proc_stub, log_lines, mock_write_s
         },
     )
 
-    with client.websocket_connect(
-        "/procs/test_proc/tail-stream?n=2"
-    ) as websocket:
+    with client.websocket_connect("/procs/test_proc/tail-stream?n=2") as websocket:
         assert websocket.receive_json() == {
             "kind": "stdout",
             "timestamp": "2024-01-01T12:00:03Z",
