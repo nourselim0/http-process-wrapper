@@ -35,9 +35,7 @@ class ProcessWrapper(BaseModel):
     _lock: Lock
     _tasks: list[Task]
     _log_buffer: deque[LogLine]
-    _subscriber_streams: dict[
-        MemoryObjectReceiveStream[LogLine], MemoryObjectSendStream[LogLine]
-    ]
+    _subscriber_streams: dict[MemoryObjectReceiveStream[LogLine], MemoryObjectSendStream[LogLine]]
 
     @computed_field
     @property
@@ -102,9 +100,7 @@ class ProcessWrapper(BaseModel):
             return output
 
     async def tail_stream(self, n: int) -> MemoryObjectReceiveStream[LogLine]:
-        send_stream, receive_stream = create_memory_object_stream[LogLine](
-            max_buffer_size=1000
-        )
+        send_stream, receive_stream = create_memory_object_stream[LogLine](max_buffer_size=1000)
         queued_lines = await self.tail(n)
         self._subscriber_streams[receive_stream] = send_stream
         for line in queued_lines:
