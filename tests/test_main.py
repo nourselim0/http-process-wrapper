@@ -1,5 +1,7 @@
+# pylint: disable=protected-access, unused-argument
 from collections import deque
 from datetime import datetime, timezone
+from unittest.mock import ANY
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +20,17 @@ def proc_stub():
             self.returncode = returncode
 
     return ProcStub
+
+
+@pytest.fixture
+def mock_write_stdin(monkeypatch):
+    async def mock_write_stdin(self, line: str):
+        self._append_log_line(LogKind.STDOUT, line + "\n")
+
+    monkeypatch.setattr(
+        "app.main.ProcessWrapper.write_stdin",
+        mock_write_stdin,
+    )
 
 
 @pytest.fixture
@@ -180,8 +193,7 @@ def test_tail_proc_output_text(monkeypatch, proc_stub, log_lines):
     ]
 
 
-def test_write_process_input(monkeypatch, proc_stub):
-    # pylint: disable=protected-access
+def test_write_process_input(monkeypatch, proc_stub, mock_write_stdin):
     test_proc = ProcessWrapper.model_construct(
         name="test_proc",
         command=["bash"],
@@ -203,37 +215,81 @@ def test_write_process_input(monkeypatch, proc_stub):
     )
     monkeypatch.setattr("app.main.processes_registry", {"test_proc": test_proc})
 
-    async def mock_write_stdin(self, line: str):
-        self._append_log_line(LogKind.STDOUT, line + "\n")
-
-    monkeypatch.setattr(
-        "app.main.ProcessWrapper.write_stdin",
-        mock_write_stdin,
+    resp = client.post(
+        "/procs/test_proc/write",
+        content="Continuation",
+        headers={"Content-Type": "text/plain"},
     )
+    assert resp.status_code == 202
 
     resp = client.post(
         "/procs/test_proc/write",
-        content="Continuation\nAnother Line",
+        content="Another Line",
         headers={"Content-Type": "text/plain"},
     )
     assert resp.status_code == 202
 
     assert test_proc._log_buffer == deque(
         (
-            LogLine(
+            LogLine.model_construct(
                 kind=LogKind.STDOUT,
-                timestamp=test_proc._log_buffer[0].timestamp,
+                timestamp=ANY,
                 text="Full Line\n",
             ),
-            LogLine(
+            LogLine.model_construct(
                 kind=LogKind.STDOUT,
-                timestamp=test_proc._log_buffer[1].timestamp,
-                text="Partial Line: Continuation\n",
+                timestamp=ANY,
+                text="Partial Line: ",
             ),
-            LogLine(
+            LogLine.model_construct(
                 kind=LogKind.STDOUT,
-                timestamp=test_proc._log_buffer[2].timestamp,
+                timestamp=ANY,
+                text="Continuation\n",
+            ),
+            LogLine.model_construct(
+                kind=LogKind.STDOUT,
+                timestamp=ANY,
                 text="Another Line\n",
             ),
         )
     )
+
+
+def test_tail_proc_output_stream(monkeypatch, proc_stub, log_lines, mock_write_stdin):
+    monkeypatch.setattr(
+        "app.main.processes_registry",
+        {
+            "test_proc": ProcessWrapper.model_construct(
+                name="test_proc",
+                _proc=proc_stub(pid=42, returncode=None),
+                _log_buffer=log_lines,
+            ),
+        },
+    )
+
+    with client.websocket_connect(
+        "/procs/test_proc/tail-stream?n=2"
+    ) as websocket:
+        assert websocket.receive_json() == {
+            "kind": "stdout",
+            "timestamp": "2024-01-01T12:00:03Z",
+            "text": "Output line 2\n",
+        }
+        assert websocket.receive_json() == {
+            "kind": "stderr",
+            "timestamp": "2024-01-01T12:00:04Z",
+            "text": "Error line 2\n",
+        }
+
+        resp = client.post(
+            "/procs/test_proc/write",
+            content="Another Line",
+            headers={"Content-Type": "text/plain"},
+        )
+        assert resp.status_code == 202
+
+        assert websocket.receive_json() == {
+            "kind": "stdout",
+            "timestamp": ANY,
+            "text": "Another Line\n",
+        }

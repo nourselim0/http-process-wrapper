@@ -1,6 +1,15 @@
 from typing import Annotated as Ann
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Response, status
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 
 from .service import LogLine, ProcessWrapper, processes_registry
 
@@ -78,6 +87,21 @@ async def tail_process_output_text(
     if prefix_timestamp:
         return [f"{line.timestamp.isoformat()} | {line.text}" for line in lines]
     return [line.text for line in lines]
+
+
+@app.websocket("/procs/{name}/tail-stream")
+async def tail_process_output_stream(
+    websocket: WebSocket,
+    proc: Ann[ProcessWrapper, Depends(resolve_process)],
+    n: int,
+):
+    await websocket.accept()
+    tail_stream = await proc.tail_stream(n)
+    try:
+        async for log_line in tail_stream:
+            await websocket.send_text(log_line.model_dump_json())
+    except WebSocketDisconnect:
+        await proc.unsubscribe_tail_stream(tail_stream)
 
 
 @app.post("/procs/{name}/stop")
