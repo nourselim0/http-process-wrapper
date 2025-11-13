@@ -25,11 +25,12 @@ Once the server is running, you can access the interactive API documentation at 
 - Start/Stop/Restart command line processes via HTTP
 - List all managed processes with their exit codes and pids
 - Polling stdout and stderr of running processes
+- Websocket support for realtime process output
 - Send input to stdin of running processes
 
 ## Future Plans
 - Dockerization (need to see if this can run as a sidecar container 👀)
-- Websocket support for real-time process output
 - Optional API Key authentication
+- Kafka-like in-memory stream for multiple websocket consumers instead of fan-out approach (check [`in-memory-stream`](https://github.com/nourselim0/http-process-wrapper/tree/in-memory-stream) tag)
 - Run default processes on launch
 - Some kind of persistence

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from enum import Enum
 import os
 from asyncio import Task, create_task
 from collections import deque
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Annotated as Ann
 from typing import Any
 
-from anyio import Lock, open_process
+from anyio import Lock, create_memory_object_stream, open_process
 from anyio.abc import Process
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from pydantic import BaseModel, StringConstraints, computed_field
 
 processes_registry: dict[str, ProcessWrapper] = {}
@@ -34,6 +35,9 @@ class ProcessWrapper(BaseModel):
     _lock: Lock
     _tasks: list[Task]
     _log_buffer: deque[LogLine]
+    _subscriber_streams: dict[
+        MemoryObjectReceiveStream[LogLine], MemoryObjectSendStream[LogLine]
+    ]
 
     @computed_field
     @property
@@ -49,6 +53,7 @@ class ProcessWrapper(BaseModel):
         self._lock = Lock()
         self._tasks = []
         self._log_buffer = deque(maxlen=1000)
+        self._subscriber_streams = {}
 
     async def start(self):
         self._proc = await open_process(self.command)
@@ -69,17 +74,15 @@ class ProcessWrapper(BaseModel):
                 self._append_log_line(kind=LogKind.STDERR, text=line.decode())
 
     def _append_log_line(self, kind: LogKind, text: str):
-        parts = text.splitlines(keepends=True)
-        last_line = self._log_buffer[-1] if self._log_buffer else None
-        start_idx = 0
-        if last_line and last_line.kind == kind and not last_line.text.endswith("\n"):
-            last_line.timestamp = datetime.now(timezone.utc)
-            last_line.text += parts[0]
-            start_idx = 1
-        for i in range(start_idx, len(parts)):
-            self._log_buffer.append(
-                LogLine(kind=kind, timestamp=datetime.now(timezone.utc), text=parts[i])
-            )
+        for part in text.splitlines(keepends=True):
+            line = LogLine(kind=kind, timestamp=datetime.now(timezone.utc), text=part)
+            self._log_buffer.append(line)
+            for receive_stream, send_stream in self._subscriber_streams.items():
+                try:
+                    send_stream.send_nowait(line)
+                except Exception:  # pylint: disable=broad-except
+                    print("Removing subscriber stream due to error")
+                    create_task(self.unsubscribe_tail_stream(receive_stream))
 
     async def write_stdin(self, line: str):
         assert self._proc is not None and self._proc.stdin is not None
@@ -97,6 +100,23 @@ class ProcessWrapper(BaseModel):
                 if n == 0:
                     break
             return output
+
+    async def tail_stream(self, n: int) -> MemoryObjectReceiveStream[LogLine]:
+        send_stream, receive_stream = create_memory_object_stream[LogLine](
+            max_buffer_size=1000
+        )
+        queued_lines = await self.tail(n)
+        self._subscriber_streams[receive_stream] = send_stream
+        for line in queued_lines:
+            await send_stream.send(line)
+        return receive_stream
+
+    async def unsubscribe_tail_stream(self, stream: MemoryObjectReceiveStream[LogLine]):
+        await stream.aclose()
+        send_stream = self._subscriber_streams.get(stream)
+        if send_stream:
+            await send_stream.aclose()
+            self._subscriber_streams.pop(stream)
 
     async def stop(self, kill=False):
         if self._proc and self._proc.returncode is None:
