@@ -1,5 +1,6 @@
 from typing import Annotated as Ann
 
+import jwt
 from fastapi import (
     Body,
     Depends,
@@ -10,10 +11,42 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
+from .config import settings
 from .service import LogLine, ProcessWrapper, processes_registry
 
 app = FastAPI()
+bearer_auth = HTTPBearer(auto_error=False)
+api_key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def enforce_auth(
+    auth_header: Ann[HTTPAuthorizationCredentials | None, Depends(bearer_auth)],
+    api_key: Ann[str | None, Depends(api_key_auth)],
+) -> None:
+    if settings.jwt_algo:
+        if auth_header is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT required")
+        try:
+            jwt.decode(
+                auth_header.credentials,
+                settings.jwt_verif_key,
+                algorithms=[settings.jwt_algo],
+            )
+        except jwt.PyJWTError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid JWT"
+            ) from exc
+
+    if settings.api_key:
+        if not api_key:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required")
+        if api_key != settings.api_key:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
+
+
+app.router.dependencies.append(Depends(enforce_auth))
 
 
 async def resolve_process(name: str) -> ProcessWrapper:
@@ -32,9 +65,7 @@ async def list_processes() -> list[ProcessWrapper]:
 @app.post("/procs")
 async def create_process(proc: ProcessWrapper, start: bool = True) -> ProcessWrapper:
     if proc.name in processes_registry:
-        raise HTTPException(
-            status_code=400, detail="Process with this name already exists"
-        )
+        raise HTTPException(status_code=400, detail="Process with this name already exists")
     processes_registry[proc.name] = proc
     if start:
         await proc.start()

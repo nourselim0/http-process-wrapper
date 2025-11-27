@@ -19,6 +19,7 @@
         "pylint",
         "pytest",
         "supervisord",
-        "uvicorn"
+        "uvicorn",
+        "verif",
     ],
 }
