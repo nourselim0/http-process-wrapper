@@ -27,10 +27,13 @@ Once the server is running, you can access the interactive API documentation at 
 - Polling stdout and stderr of running processes
 - Websocket support for realtime process output
 - Send input to stdin of running processes
+- Optional authentication (Bearer JWT or API Key)
+  - For JWT, the server accepts any valid token signed with the configured secret and algorithm
+  - Token generation is out of scope for this project
 
 ## Future Plans
-- Dockerization (need to see if this can run as a sidecar container 👀)
-- Optional API Key authentication
+- Dockerization
+- JWT scopes to restrict access to specific processes
 - Kafka-like in-memory stream for multiple websocket consumers instead of fan-out approach (check [`in-memory-stream`](https://github.com/nourselim0/http-process-wrapper/tree/in-memory-stream) tag)
 - Run default processes on launch
 - Some kind of persistence
