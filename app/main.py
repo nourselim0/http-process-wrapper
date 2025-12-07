@@ -6,6 +6,7 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Query,
     Response,
     WebSocket,
     WebSocketDisconnect,
@@ -21,16 +22,23 @@ bearer_auth = HTTPBearer(auto_error=False)
 api_key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-def enforce_auth(
+def enforce_http_auth(
     auth_header: Ann[HTTPAuthorizationCredentials | None, Depends(bearer_auth)],
     api_key: Ann[str | None, Depends(api_key_auth)],
 ) -> None:
+    enforce_ws_auth(auth_header.credentials if auth_header else None, api_key)
+
+
+def enforce_ws_auth(
+    jwt_token: Ann[str | None, Query()] = None,
+    api_key: Ann[str | None, Query()] = None,
+) -> None:
     if settings.jwt_algo:
-        if auth_header is None:
+        if jwt_token is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT required")
         try:
             jwt.decode(
-                auth_header.credentials,
+                jwt_token,
                 settings.jwt_verif_key,
                 algorithms=[settings.jwt_algo],
             )
@@ -46,9 +54,6 @@ def enforce_auth(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
 
 
-app.router.dependencies.append(Depends(enforce_auth))
-
-
 async def resolve_process(name: str) -> ProcessWrapper:
     """Dependency: resolve a process by name or raise 404."""
     proc = processes_registry.get(name)
@@ -57,12 +62,12 @@ async def resolve_process(name: str) -> ProcessWrapper:
     return proc
 
 
-@app.get("/procs")
+@app.get("/procs", dependencies=[Depends(enforce_http_auth)])
 async def list_processes() -> list[ProcessWrapper]:
     return list(processes_registry.values())
 
 
-@app.post("/procs")
+@app.post("/procs", dependencies=[Depends(enforce_http_auth)])
 async def create_process(proc: ProcessWrapper, start: bool = True) -> ProcessWrapper:
     if proc.name in processes_registry:
         raise HTTPException(status_code=400, detail="Process with this name already exists")
@@ -72,14 +77,14 @@ async def create_process(proc: ProcessWrapper, start: bool = True) -> ProcessWra
     return proc
 
 
-@app.get("/procs/{name}")
+@app.get("/procs/{name}", dependencies=[Depends(enforce_http_auth)])
 async def get_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
 ) -> ProcessWrapper:
     return proc
 
 
-@app.post("/procs/{name}/start")
+@app.post("/procs/{name}/start", dependencies=[Depends(enforce_http_auth)])
 async def start_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
 ) -> ProcessWrapper:
@@ -89,7 +94,11 @@ async def start_process(
     return proc
 
 
-@app.post("/procs/{name}/write", status_code=status.HTTP_202_ACCEPTED)
+@app.post(
+    "/procs/{name}/write",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(enforce_http_auth)],
+)
 async def write_process_input(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
     line: Ann[str, Body()],
@@ -98,7 +107,7 @@ async def write_process_input(
     return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
-@app.get("/procs/{name}/tail")
+@app.get("/procs/{name}/tail", dependencies=[Depends(enforce_http_auth)])
 async def tail_process_output(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
     n: int,
@@ -107,7 +116,7 @@ async def tail_process_output(
     return await proc.tail(n, include_stderr)
 
 
-@app.get("/procs/{name}/tail-text")
+@app.get("/procs/{name}/tail-text", dependencies=[Depends(enforce_http_auth)])
 async def tail_process_output_text(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
     n: int,
@@ -120,7 +129,7 @@ async def tail_process_output_text(
     return [line.text for line in lines]
 
 
-@app.websocket("/procs/{name}/tail-stream")
+@app.websocket("/procs/{name}/tail-stream", dependencies=[Depends(enforce_ws_auth)])
 async def tail_process_output_stream(
     websocket: WebSocket,
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
@@ -135,7 +144,7 @@ async def tail_process_output_stream(
         await proc.unsubscribe_tail_stream(tail_stream)
 
 
-@app.post("/procs/{name}/stop")
+@app.post("/procs/{name}/stop", dependencies=[Depends(enforce_http_auth)])
 async def stop_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
     kill: bool = False,
@@ -144,7 +153,7 @@ async def stop_process(
     return proc
 
 
-@app.post("/procs/{name}/restart")
+@app.post("/procs/{name}/restart", dependencies=[Depends(enforce_http_auth)])
 async def restart_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
     kill_existing: bool = False,
@@ -154,7 +163,11 @@ async def restart_process(
     return proc
 
 
-@app.delete("/procs/{name}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete(
+    "/procs/{name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(enforce_http_auth)],
+)
 async def delete_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
 ) -> Response:
