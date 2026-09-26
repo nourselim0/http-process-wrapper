@@ -67,8 +67,7 @@ async def list_processes() -> list[ProcessWrapper]:
     return list(processes_registry.values())
 
 
-@app.post("/procs", dependencies=[Depends(enforce_http_auth)])
-async def create_process(proc: ProcessWrapper, start: bool = True) -> ProcessWrapper:
+@app.post("/procs", status_code=status.HTTP_201_CREATED)
     if proc.name in processes_registry:
         raise HTTPException(status_code=400, detail="Process with this name already exists")
     processes_registry[proc.name] = proc
