@@ -25,23 +25,24 @@ api_key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
 def enforce_http_auth(
     auth_header: Ann[HTTPAuthorizationCredentials | None, Depends(bearer_auth)],
     api_key: Ann[str | None, Depends(api_key_auth)],
-) -> None:
-    enforce_ws_auth(auth_header.credentials if auth_header else None, api_key)
+) -> str | None:
+    return enforce_ws_auth(auth_header.credentials if auth_header else None, api_key)
 
 
 def enforce_ws_auth(
     jwt_token: Ann[str | None, Query()] = None,
     api_key: Ann[str | None, Query()] = None,
-) -> None:
+) -> str | None:
     if settings.jwt_algo:
         if jwt_token is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT required")
         try:
-            jwt.decode(
+            payload = jwt.decode(
                 jwt_token,
                 settings.jwt_verif_key,
                 algorithms=[settings.jwt_algo],
             )
+            return payload.get("sub") or "jwt"
         except jwt.PyJWTError as exc:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Invalid JWT"
@@ -52,6 +53,7 @@ def enforce_ws_auth(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required")
         if api_key != settings.api_key:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
+        return "api-key"
 
 
 async def resolve_process(name: str) -> ProcessWrapper:
@@ -68,8 +70,12 @@ async def list_processes() -> list[ProcessWrapper]:
 
 
 @app.post("/procs", status_code=status.HTTP_201_CREATED)
+async def create_process(
+    proc: ProcessWrapper, username: Ann[str | None, Depends(enforce_http_auth)], start: bool = True
+) -> ProcessWrapper:
     if proc.name in processes_registry:
         raise HTTPException(status_code=400, detail="Process with this name already exists")
+    proc.owner = username
     processes_registry[proc.name] = proc
     if start:
         await proc.start()

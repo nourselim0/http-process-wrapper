@@ -12,7 +12,11 @@
             ],
             "console": "internalConsole",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}",
+
+                // comment these out to disable authentication
+                "JWT_ALGO": "HS256",
+                "JWT_VERIF_KEY": "secret",
             }
         },
         {
@@ -25,7 +29,11 @@
             ],
             "console": "internalConsole",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}",
+
+                // comment these out to disable authentication
+                "JWT_ALGO": "HS256",
+                "JWT_VERIF_KEY": "secret",
             }
         },
     ]

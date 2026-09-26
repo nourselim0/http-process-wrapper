@@ -3,13 +3,35 @@ from collections import deque
 from datetime import datetime, timezone
 from unittest.mock import ANY
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, settings
 from app.service import LogKind, LogLine, ProcessWrapper
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def api_key_auth(monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "test-api-key")
+    return "test-api-key"
+
+
+@pytest.fixture
+def jwt_auth(monkeypatch):
+    monkeypatch.setattr(settings, "jwt_algo", "HS256")
+    monkeypatch.setattr(settings, "jwt_verif_key", "secret")
+    return jwt.encode({"sub": "test"}, "secret", algorithm="HS256")
+
+
+@pytest.fixture(autouse=True)
+def clear_proc_registry_afterwards():
+    from app.main import processes_registry
+
+    yield
+    processes_registry.clear()
 
 
 @pytest.fixture
@@ -80,11 +102,13 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
             "proc_a": ProcessWrapper.model_construct(
                 name="proc_a",
                 command=["echo", "test"],
+                owner="tricia.mcmillan",
                 _proc=proc_stub(pid=None, returncode=None),
             ),
             "proc_b": ProcessWrapper.model_construct(
                 name="proc_b",
                 command=["echo", "test"],
+                owner=None,
                 _proc=proc_stub(pid=42, returncode=0),
             ),
         },
@@ -100,15 +124,85 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
     assert {
         "name": "proc_a",
         "command": ["echo", "test"],
+        "owner": "tricia.mcmillan",
         "pid": None,
         "returncode": None,
     } in data
     assert {
         "name": "proc_b",
         "command": ["echo", "test"],
+        "owner": None,
         "pid": 42,
         "returncode": 0,
     } in data
+
+
+def test_list_procs_with_api_key_auth(api_key_auth):
+    resp = client.get("/procs")
+    assert resp.status_code == 401
+
+    resp = client.get("/procs", headers={"X-API-Key": "invalid-key"})
+    assert resp.status_code == 403
+
+    resp = client.get("/procs", headers={"X-API-Key": api_key_auth})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_list_procs_with_jwt_auth(jwt_auth):
+    resp = client.get("/procs")
+    assert resp.status_code == 401
+
+    resp = client.get("/procs", headers={"Authorization": "Bearer invalid-token"})
+    assert resp.status_code == 403
+
+    resp = client.get("/procs", headers={"Authorization": f"Bearer {jwt_auth}"})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_create_proc():
+    resp = client.post("/procs?start=false", json={"name": "test-proc", "command": ["echo", "hello"]})
+    assert resp.status_code == 201, resp.text
+    assert resp.json() == {
+        "name": "test-proc",
+        "command": ["echo", "hello"],
+        "owner": None,
+        "pid": None,
+        "returncode": None,
+    }
+
+
+def test_create_proc_with_api_key_auth(api_key_auth):
+    resp = client.post(
+        "/procs?start=false",
+        json={"name": "test-proc", "command": ["echo", "hello"]},
+        headers={"X-API-Key": api_key_auth},
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json() == {
+        "name": "test-proc",
+        "command": ["echo", "hello"],
+        "owner": "api-key",
+        "pid": None,
+        "returncode": None,
+    }
+
+
+def test_create_proc_with_jwt_auth(jwt_auth):
+    resp = client.post(
+        "/procs?start=false",
+        json={"name": "test-proc", "command": ["echo", "hello"]},
+        headers={"Authorization": f"Bearer {jwt_auth}"},
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json() == {
+        "name": "test-proc",
+        "command": ["echo", "hello"],
+        "owner": "test",
+        "pid": None,
+        "returncode": None,
+    }
 
 
 def test_tail_proc_output(monkeypatch, proc_stub, log_lines):

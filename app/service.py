@@ -30,6 +30,7 @@ class LogLine(BaseModel):
 class ProcessWrapper(BaseModel):
     name: Ann[str, StringConstraints(pattern=r"^[\w\-_]+$")]
     command: list[str]
+    owner: str | None = None
 
     _proc: Process | None = None
     _lock: Lock
