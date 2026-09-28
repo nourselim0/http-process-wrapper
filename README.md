@@ -18,6 +18,16 @@ poetry run uvicorn app.main:app
 
 > Note: when running on Windows you can't use reload because uvicorn will then use an asyncio loop implementation that does not support subprocesses.
 
+## Building with PEX
+To build the project as a standalone executable using PEX, run:
+
+```bash
+poetry export --without-hashes -o ./dist/reqs.lock.txt
+poetry run pex . -r dist/reqs.lock.txt -o dist/http-process-wrapper.pex -e app:serve --scie eager --scie-platform linux-x86_64 --scie-platform musl-linux-x86_64
+```
+
+> Note: The `--scie` options are used to create self-contained interpreters for different platforms. Adjust them according to your target environment.
+
 ## API Docs
 Once the server is running, you can access the interactive API documentation at `http://127.0.0.1:8000/docs`
 
