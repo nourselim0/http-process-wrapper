@@ -19,14 +19,16 @@ poetry run uvicorn app.main:app
 > Note: when running on Windows you can't use reload because uvicorn will then use an asyncio loop implementation that does not support subprocesses.
 
 ## Building with PEX
-To build the project as a standalone executable using PEX, run:
-
+To build the project as a standalone executable (for musl and glibc) using PEX, run:
 ```bash
-poetry export --without-hashes -o ./dist/reqs.lock.txt
-poetry run pex . -r dist/reqs.lock.txt -o dist/http-process-wrapper.pex -e app:serve --scie eager --scie-platform linux-x86_64 --scie-platform musl-linux-x86_64
+docker build . -f builder.dockerfile --target exporter --output ./dist
 ```
+You can then copy the built executable into any docker image (even if it doesn't have python) and it will give you the ability to control its processes via HTTP ✨ (eg: Minecraft server management? 👀)
 
-> Note: The `--scie` options are used to create self-contained interpreters for different platforms. Adjust them according to your target environment.
+To make cross-platform PEX builds that don't include the python runtime/interpreter, run:
+```bash
+pex . -o ./dist/http-process-wrapper.pex -e app:serve
+```
 
 ## API Docs
 Once the server is running, you can access the interactive API documentation at `http://127.0.0.1:8000/docs`
@@ -42,7 +44,6 @@ Once the server is running, you can access the interactive API documentation at 
   - Token generation is out of scope for this project
 
 ## Future Plans
-- Dockerization
 - JWT scopes to restrict access to specific processes
 - Kafka-like in-memory stream for multiple websocket consumers instead of fan-out approach (check [`in-memory-stream`](https://github.com/nourselim0/http-process-wrapper/tree/in-memory-stream) tag)
 - Run default processes on launch

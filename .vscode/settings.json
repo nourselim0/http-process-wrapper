@@ -21,6 +21,7 @@
         "pydantic",
         "pylint",
         "pytest",
+        "scie",
         "supervisord",
         "uvicorn",
         "verif",
