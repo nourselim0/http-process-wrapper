@@ -176,7 +176,7 @@ async def restart_process(
 async def delete_process(
     proc: Ann[ProcessWrapper, Depends(resolve_process)],
 ) -> Response:
-    if proc.returncode is None:
+    if proc.pid is not None and proc.returncode is None:
         raise HTTPException(status_code=400, detail="Process is still running")
     del processes_registry[proc.name]
     return Response(status_code=status.HTTP_204_NO_CONTENT)
