@@ -78,7 +78,11 @@ async def create_process(
     proc = proc.model_copy(update={"owner": username})
     processes_registry[proc.name] = proc
     if start:
-        await proc.start()
+        try:
+            await proc.start()
+        except FileNotFoundError as ex:
+            del processes_registry[proc.name]
+            raise HTTPException(status_code=400, detail=f"Invalid Process Command")
     return proc
 
 
@@ -95,7 +99,10 @@ async def start_process(
 ) -> ProcessWrapper:
     if proc.pid is not None:
         raise HTTPException(status_code=400, detail="Process has already started")
-    await proc.start()
+    try:
+        await proc.start()
+    except FileNotFoundError as ex:
+        raise HTTPException(status_code=400, detail=f"Invalid Process Command")
     return proc
 
 

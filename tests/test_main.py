@@ -224,6 +224,15 @@ def test_create_proc_with_jwt_auth(jwt_auth):
     }
 
 
+def test_create_proc_invalid_command():
+    resp = client.post(
+        "/procs?start=true",
+        json={"name": "test-proc", "command": ["invalid"]},
+    )
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "Invalid Process Command"}
+
+
 def test_tail_proc_output(monkeypatch, proc_stub, log_lines):
     monkeypatch.setattr(
         "app.main.processes_registry",
