@@ -30,6 +30,8 @@ class LogLine(BaseModel):
 class ProcessWrapper(BaseModel):
     name: Ann[str, StringConstraints(pattern=r"^[\w\-_]+$")]
     command: list[str]
+    cwd: str | None = None
+    env: dict[str, str] | None = None
     owner: Ann[str | None, Field(json_schema_extra={"readOnly": True})] = None
 
     _proc: Process | None = None
@@ -55,7 +57,7 @@ class ProcessWrapper(BaseModel):
         self._subscriber_streams = {}
 
     async def start(self):
-        self._proc = await open_process(self.command)
+        self._proc = await open_process(self.command, cwd=self.cwd, env=self.env)
 
         self._tasks.append(create_task(self._read_stdout()))
         self._tasks.append(create_task(self._read_stderr()))

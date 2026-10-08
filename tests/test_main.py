@@ -125,6 +125,8 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
         "name": "proc_a",
         "command": ["echo", "test"],
         "owner": "tricia.mcmillan",
+        "cwd": None,
+        "env": None,
         "pid": None,
         "returncode": None,
     } in data
@@ -132,6 +134,8 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
         "name": "proc_b",
         "command": ["echo", "test"],
         "owner": None,
+        "cwd": None,
+        "env": None,
         "pid": 42,
         "returncode": 0,
     } in data
@@ -168,6 +172,8 @@ def test_create_proc():
             "name": "test-proc",
             "command": ["echo", "hello"],
             "owner": "ignored",
+            "cwd": "/home",
+            "env": {"var1": "val1"},
         },
     )
     assert resp.status_code == 201, resp.text
@@ -175,6 +181,8 @@ def test_create_proc():
         "name": "test-proc",
         "command": ["echo", "hello"],
         "owner": None,
+        "cwd": "/home",
+        "env": {"var1": "val1"},
         "pid": None,
         "returncode": None,
     }
@@ -191,6 +199,8 @@ def test_create_proc_with_api_key_auth(api_key_auth):
         "name": "test-proc",
         "command": ["echo", "hello"],
         "owner": "api-key",
+        "cwd": None,
+        "env": None,
         "pid": None,
         "returncode": None,
     }
@@ -207,6 +217,8 @@ def test_create_proc_with_jwt_auth(jwt_auth):
         "name": "test-proc",
         "command": ["echo", "hello"],
         "owner": "test",
+        "cwd": None,
+        "env": None,
         "pid": None,
         "returncode": None,
     }
