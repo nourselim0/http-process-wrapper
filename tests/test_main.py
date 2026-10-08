@@ -162,7 +162,14 @@ def test_list_procs_with_jwt_auth(jwt_auth):
 
 
 def test_create_proc():
-    resp = client.post("/procs?start=false", json={"name": "test-proc", "command": ["echo", "hello"]})
+    resp = client.post(
+        "/procs?start=false",
+        json={
+            "name": "test-proc",
+            "command": ["echo", "hello"],
+            "owner": "ignored",
+        },
+    )
     assert resp.status_code == 201, resp.text
     assert resp.json() == {
         "name": "test-proc",
@@ -176,7 +183,7 @@ def test_create_proc():
 def test_create_proc_with_api_key_auth(api_key_auth):
     resp = client.post(
         "/procs?start=false",
-        json={"name": "test-proc", "command": ["echo", "hello"]},
+        json={"name": "test-proc", "command": ["echo", "hello"], "owner": "ignored"},
         headers={"X-API-Key": api_key_auth},
     )
     assert resp.status_code == 201, resp.text
@@ -192,7 +199,7 @@ def test_create_proc_with_api_key_auth(api_key_auth):
 def test_create_proc_with_jwt_auth(jwt_auth):
     resp = client.post(
         "/procs?start=false",
-        json={"name": "test-proc", "command": ["echo", "hello"]},
+        json={"name": "test-proc", "command": ["echo", "hello"], "owner": "ignored"},
         headers={"Authorization": f"Bearer {jwt_auth}"},
     )
     assert resp.status_code == 201, resp.text

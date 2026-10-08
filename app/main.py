@@ -75,7 +75,7 @@ async def create_process(
 ) -> ProcessWrapper:
     if proc.name in processes_registry:
         raise HTTPException(status_code=400, detail="Process with this name already exists")
-    proc.owner = username
+    proc = proc.model_copy(update={"owner": username})
     processes_registry[proc.name] = proc
     if start:
         await proc.start()

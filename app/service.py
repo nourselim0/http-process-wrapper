@@ -11,7 +11,7 @@ from typing import Any
 from anyio import Lock, create_memory_object_stream, open_process
 from anyio.abc import Process
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-from pydantic import BaseModel, StringConstraints, computed_field
+from pydantic import BaseModel, Field, StringConstraints, computed_field
 
 processes_registry: dict[str, ProcessWrapper] = {}
 
@@ -30,7 +30,7 @@ class LogLine(BaseModel):
 class ProcessWrapper(BaseModel):
     name: Ann[str, StringConstraints(pattern=r"^[\w\-_]+$")]
     command: list[str]
-    owner: str | None = None
+    owner: Ann[str | None, Field(json_schema_extra={"readOnly": True})] = None
 
     _proc: Process | None = None
     _lock: Lock
