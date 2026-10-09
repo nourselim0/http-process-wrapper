@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from typing import Annotated as Ann
 
 import jwt
@@ -17,7 +19,21 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 from .config import settings
 from .service import LogLine, ProcessWrapper, processes_registry
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.init_procs:
+        for proc in settings.init_procs:
+            processes_registry[proc.name] = proc
+            await proc.start()
+
+    yield
+
+    stop_tasks = [proc.stop() for proc in processes_registry.values()]
+    await asyncio.gather(*stop_tasks)
+
+
+app = FastAPI(lifespan=lifespan)
 bearer_auth = HTTPBearer(auto_error=False)
 api_key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
 

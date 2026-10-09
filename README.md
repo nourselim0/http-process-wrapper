@@ -33,6 +33,29 @@ pex . -o ./dist/http-process-wrapper.pex -e app:serve
 ## API Docs
 Once the server is running, you can access the interactive API documentation at `http://127.0.0.1:8000/docs`
 
+## Init Processes
+
+You can define initial processes to be started when the server launches by creating an `init_procs.yaml` file in the project root. The format is as follows:
+
+```yaml
+- name: ping-test
+  command:
+    - ping
+    - 8.8.8.8
+- name: echo-test
+  command:
+    - bash
+    - -c
+    - echo "$var"
+  env:
+    var: value
+- name: ls-test
+  command:
+    - ls
+    - -ahl
+  cwd: /home
+```
+
 ## Features
 - Start/Stop/Restart command line processes via HTTP
 - List all managed processes with their exit codes and pids
@@ -42,9 +65,9 @@ Once the server is running, you can access the interactive API documentation at 
 - Optional authentication (Bearer JWT or API Key)
   - For JWT, the server accepts any valid token signed with the configured secret and algorithm
   - Token generation is out of scope for this project
+- Define initial processes to be started on server launch via `init_procs.yaml`
 
 ## Future Plans
 - JWT scopes to restrict access to specific processes
 - Kafka-like in-memory stream for multiple websocket consumers instead of fan-out approach (check [`in-memory-stream`](https://github.com/nourselim0/http-process-wrapper/tree/in-memory-stream) tag)
-- Run default processes on launch
 - Some kind of persistence
