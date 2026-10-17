@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app, settings
 from app.service import LogKind, LogLine, ProcessWrapper
+from app.stats import ProcessStats
 
 client = TestClient(app)
 
@@ -110,6 +111,12 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
                 command=["echo", "test"],
                 owner=None,
                 _proc=proc_stub(pid=42, returncode=0),
+                stats=ProcessStats.model_construct(
+                    cpu_percent=4.20,
+                    mem_usage_mb=42,
+                    mem_percent=2.40,
+                    num_threads=24,
+                ),
             ),
         },
     )
@@ -129,6 +136,12 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
         "env": None,
         "pid": None,
         "returncode": None,
+        "stats": {
+            "cpu_percent": None,
+            "mem_usage_mb": None,
+            "mem_percent": None,
+            "num_threads": None,
+        },
     } in data
     assert {
         "name": "proc_b",
@@ -138,6 +151,12 @@ def test_list_procs_with_entries(monkeypatch, proc_stub):
         "env": None,
         "pid": 42,
         "returncode": 0,
+        "stats": {
+            "cpu_percent": 4.20,
+            "mem_usage_mb": 42,
+            "mem_percent": 2.40,
+            "num_threads": 24,
+        },
     } in data
 
 
@@ -185,6 +204,12 @@ def test_create_proc():
         "env": {"var1": "val1"},
         "pid": None,
         "returncode": None,
+        "stats": {
+            "cpu_percent": None,
+            "mem_usage_mb": None,
+            "mem_percent": None,
+            "num_threads": None,
+        },
     }
 
 
@@ -203,6 +228,12 @@ def test_create_proc_with_api_key_auth(api_key_auth):
         "env": None,
         "pid": None,
         "returncode": None,
+        "stats": {
+            "cpu_percent": None,
+            "mem_usage_mb": None,
+            "mem_percent": None,
+            "num_threads": None,
+        },
     }
 
 
@@ -221,6 +252,12 @@ def test_create_proc_with_jwt_auth(jwt_auth):
         "env": None,
         "pid": None,
         "returncode": None,
+        "stats": {
+            "cpu_percent": None,
+            "mem_usage_mb": None,
+            "mem_percent": None,
+            "num_threads": None,
+        },
     }
 
 

@@ -62,9 +62,11 @@ You can define initial processes to be started when the server launches by creat
 - Polling stdout and stderr of running processes
 - Websocket support for realtime process output
 - Send input to stdin of running processes
-- Optional authentication (Bearer JWT or API Key)
-  - For JWT, the server accepts any valid token signed with the configured secret and algorithm
+- Optional authentication (Bearer JWT or API Key), when it comes to JWT:
+  - The server accepts any valid token signed with the configured secret and algorithm
+  - You can optionally add the `sub` claim which sets the process owner
   - Token generation is out of scope for this project
+- Gather and expose resource usage statistics (CPU, memory, etc) for all managed processes
 - Define initial processes to be started on server launch via `init_procs.yaml`
 
 ## Future Plans

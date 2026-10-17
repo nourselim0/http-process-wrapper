@@ -13,6 +13,8 @@ from anyio.abc import Process
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from pydantic import BaseModel, Field, StringConstraints, computed_field
 
+from .stats import ProcessStats
+
 processes_registry: dict[str, ProcessWrapper] = {}
 
 
@@ -33,6 +35,7 @@ class ProcessWrapper(BaseModel):
     cwd: str | None = None
     env: dict[str, str] | None = None
     owner: Ann[str | None, Field(json_schema_extra={"readOnly": True})] = None
+    stats: ProcessStats = Field(json_schema_extra={"readOnly": True}, default_factory=ProcessStats)
 
     _proc: Process | None = None
     _lock: Lock
@@ -61,6 +64,8 @@ class ProcessWrapper(BaseModel):
 
         self._tasks.append(create_task(self._read_stdout()))
         self._tasks.append(create_task(self._read_stderr()))
+
+        self.stats.start(self._proc.pid)
 
     async def _read_stdout(self):
         assert self._proc is not None and self._proc.stdout is not None
